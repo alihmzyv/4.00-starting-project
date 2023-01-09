@@ -10,18 +10,27 @@ import com.luv2code.springmvc.service.StudentAndGradeService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
-import javax.print.attribute.standard.Media;
 
+import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@AutoConfigureMockMvc
+@SpringBootTest
 class GradebookControllerTest {
     @Autowired
     private MockMvc mockMvc;
@@ -107,5 +116,29 @@ class GradebookControllerTest {
         jdbc.execute(sqlDeleteHistoryGrade);
     }
 
-    
+    @Test
+    void getStudentsHttpRequest() throws Exception {
+        collegeStudent.setFirstname("Chad");
+        collegeStudent.setLastname("Darby");
+        collegeStudent.setEmailAddress("chad@luv2code.com");
+        studentDao.save(collegeStudent);
+        mockMvc.perform(MockMvcRequestBuilders.get("/"))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
+                .andExpect(MockMvcResultMatchers.jsonPath("$", hasSize(2)));
+    }
+
+    @Test
+    void createStudentHttpRequest() throws Exception {
+        collegeStudent.setFirstname("Chad");
+        collegeStudent.setLastname("Darby");
+        collegeStudent.setEmailAddress("chad@luv2code.com");
+        mockMvc.perform(MockMvcRequestBuilders.post("/")
+                        .contentType(APPLICATION_JSON_UTF8)
+                        .content(mapper.writeValueAsString(collegeStudent)))
+                .andExpect(MockMvcResultMatchers.status().isOk()) //isCreated() is the right choice actually
+                .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
+                .andExpect(MockMvcResultMatchers.jsonPath("$", hasSize(2)));
+        assertTrue(studentDao.existsById(2), "Student should have been saved already.");
+    }
 }
