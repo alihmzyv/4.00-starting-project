@@ -8,7 +8,6 @@ import com.luv2code.springmvc.repository.StudentDao;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
-
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.ui.Model;
 
@@ -73,7 +72,7 @@ public class StudentAndGradeService {
 	public GradebookCollegeStudent studentInformation(int id) {
 		Optional<CollegeStudent> student = studentDao.findById(id);
 
-		if (!student.isPresent()) {
+		if (student.isEmpty()) {
 			return null;
 		}
 
@@ -97,10 +96,8 @@ public class StudentAndGradeService {
 		studentGrades.setScienceGradeResults(scienceGradesList);
 		studentGrades.setHistoryGradeResults(historyGradesList);
 
-		GradebookCollegeStudent gradebookCollegeStudent = new GradebookCollegeStudent(student.get().getId(), student.get().getFirstname(), student.get().getLastname(),
+		return new GradebookCollegeStudent(student.get().getId(), student.get().getFirstname(), student.get().getLastname(),
 				student.get().getEmailAddress(), studentGrades);
-
-		return gradebookCollegeStudent;
 	}
 
 	public boolean checkIfGradeIsNull(int id, String gradeType){
@@ -118,9 +115,7 @@ public class StudentAndGradeService {
 		}
 		if (gradeType.equals("history")) {
 			Optional<HistoryGrade> grade = historyGradeDao.findById(id);
-			if (grade.isPresent()) {
-				return true;
-			}
+			return grade.isPresent();
 		}
 
 		return false;
@@ -132,7 +127,7 @@ public class StudentAndGradeService {
 
 		if (gradeType.equals("math")) {
 			Optional<MathGrade> grade = mathGradeDao.findById(id);
-			if (!grade.isPresent()) {
+			if (grade.isEmpty()) {
 				return studentId;
 			}
 			studentId = grade.get().getStudentId();
@@ -141,7 +136,7 @@ public class StudentAndGradeService {
 
 		if (gradeType.equals("science")) {
 			Optional<ScienceGrade> grade = scienceGradeDao.findById(id);
-			if (!grade.isPresent()) {
+			if (grade.isEmpty()) {
 				return studentId;
 			}
 			studentId = grade.get().getStudentId();
@@ -150,7 +145,7 @@ public class StudentAndGradeService {
 
 		if (gradeType.equals("history")) {
 			Optional<HistoryGrade> grade = historyGradeDao.findById(id);
-			if (!grade.isPresent()) {
+			if (grade.isEmpty()) {
 				return studentId;
 			}
 			studentId = grade.get().getStudentId();

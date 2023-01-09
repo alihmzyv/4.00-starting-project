@@ -2,7 +2,9 @@ package com.luv2code.springmvc.controller;
 
 import com.luv2code.springmvc.exceptionhandling.StudentOrGradeErrorResponse;
 import com.luv2code.springmvc.exceptionhandling.StudentOrGradeNotFoundException;
-import com.luv2code.springmvc.models.*;
+import com.luv2code.springmvc.models.CollegeStudent;
+import com.luv2code.springmvc.models.Gradebook;
+import com.luv2code.springmvc.models.GradebookCollegeStudent;
 import com.luv2code.springmvc.service.StudentAndGradeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -96,9 +98,7 @@ public class GradebookController {
             throw new StudentOrGradeNotFoundException("Student or Grade was not found");
         }
 
-        GradebookCollegeStudent studentEntity = studentService.studentInformation(studentId);
-
-        return studentEntity;
+        return studentService.studentInformation(studentId);
     }
 
     @ExceptionHandler

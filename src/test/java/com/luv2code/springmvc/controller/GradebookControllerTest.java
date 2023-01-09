@@ -3,16 +3,11 @@ package com.luv2code.springmvc.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luv2code.springmvc.models.CollegeStudent;
 import com.luv2code.springmvc.models.MathGrade;
-import com.luv2code.springmvc.repository.HistoryGradesDao;
 import com.luv2code.springmvc.repository.MathGradesDao;
-import com.luv2code.springmvc.repository.ScienceGradesDao;
 import com.luv2code.springmvc.repository.StudentDao;
-import com.luv2code.springmvc.service.StudentAndGradeService;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -22,40 +17,35 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
-import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
-import javax.persistence.EntityManager;
-import javax.persistence.PersistenceContext;
 import java.util.Iterator;
+import java.util.Optional;
 import java.util.Random;
 
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.hamcrest.core.IsEqual.equalTo;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @AutoConfigureMockMvc
 @SpringBootTest
 class GradebookControllerTest {
+    private static final Random rnd = new Random();
+
     @Autowired
     private MockMvc mockMvc;
-    private MockHttpServletRequest createStudentReq;
-    private MockHttpServletRequest createGradeReq;
 
     @Autowired
     private ObjectMapper mapper;
 
-    private static final MediaType APPLICATION_JSON_UTF8 = MediaType.APPLICATION_JSON;
+    private MockHttpServletRequest createStudentReq;
+
+    private MockHttpServletRequest createGradeReq;
 
     @Autowired
     private CollegeStudent collegeStudent;
-    @PersistenceContext
-    private EntityManager entityManager;
-
-    @Mock
-    private StudentAndGradeService studentCreateServiceMock;
-
-    private static final Random rnd = new Random();
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -65,15 +55,6 @@ class GradebookControllerTest {
 
     @Autowired
     private MathGradesDao mathGradeDao;
-
-    @Autowired
-    private ScienceGradesDao scienceGradeDao;
-
-    @Autowired
-    private HistoryGradesDao historyGradeDao;
-
-    @Autowired
-    private StudentAndGradeService studentService;
 
     @Value("${sql.script.create.student}")
     private String sqlAddStudent;
@@ -101,6 +82,7 @@ class GradebookControllerTest {
 
     @BeforeEach
     void setUp() {
+        //set up requests
         createStudentReq = new MockHttpServletRequest();
         createStudentReq.setParameter("firstname", "Ali");
         createStudentReq.setParameter("lastname", "Hamzayev");
@@ -109,6 +91,8 @@ class GradebookControllerTest {
         createGradeReq.setParameter("grade", "90.0");
         createGradeReq.setParameter("gradeType", "math");
         createGradeReq.setParameter("studentId", "1");
+
+        //execute sql's
         jdbc.execute(sqlAddStudent);
         jdbc.execute(sqlAddMathGrade);
         jdbc.execute(sqlAddScienceGrade);
@@ -130,10 +114,12 @@ class GradebookControllerTest {
         collegeStudent.setEmailAddress("chad@luv2code.com");
         studentDao.save(collegeStudent);
         mockMvc.perform(MockMvcRequestBuilders.get("/"))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
-                .andExpect(MockMvcResultMatchers.jsonPath("$", hasSize(2)));
-        assertTrue(studentDao.findByEmailAddress("chad@luv2code.com").isPresent(), "Should have been saved.");
+                        .andExpectAll(
+                                status().isOk(), //isCreated() is the right choice actually
+                                content().contentType(APPLICATION_JSON),
+                                jsonPath("$", hasSize(2)));
+        assertTrue(studentDao.findByEmailAddress("chad@luv2code.com").isPresent(),
+                "Should have been saved.");
     }
 
     @Test
@@ -142,11 +128,12 @@ class GradebookControllerTest {
         collegeStudent.setLastname("Darby");
         collegeStudent.setEmailAddress("chad@luv2code.com");
         mockMvc.perform(MockMvcRequestBuilders.post("/")
-                        .contentType(APPLICATION_JSON_UTF8)
+                        .contentType(APPLICATION_JSON)
                         .content(mapper.writeValueAsString(collegeStudent)))
-                .andExpect(MockMvcResultMatchers.status().isOk()) //isCreated() is the right choice actually
-                .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
-                .andExpect(MockMvcResultMatchers.jsonPath("$", hasSize(2)));
+                .andExpectAll(
+                        status().isOk(), //isCreated() is the right choice actually
+                        content().contentType(APPLICATION_JSON),
+                        jsonPath("$", hasSize(2)));
         studentDao.findAll().forEach(System.out::println);
         assertTrue(studentDao.findByEmailAddress("chad@luv2code.com").isPresent(), "Student should have been saved already.");
     }
@@ -155,20 +142,23 @@ class GradebookControllerTest {
     void deleteNonExistingStudentRequestTest() throws Exception {
         assertFalse(studentDao.existsById(2));
         mockMvc.perform(MockMvcRequestBuilders.delete("/student/{id}", 2))
-                .andExpect(MockMvcResultMatchers.status().isNotFound())
-                .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
-                .andExpectAll(MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")),
-                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)));
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentType(APPLICATION_JSON))
+                .andExpectAll(
+                        jsonPath("$.message", equalTo("Student or Grade was not found")),
+                        jsonPath("$.status", equalTo(404)));
     }
 
     @Test
     void deleteExistingStudentRequestTest() throws Exception {
-        assertTrue(studentDao.existsById(1));
-        CollegeStudent student = studentDao.findById(1).get();
+        Optional<CollegeStudent> studentOpt = studentDao.findById(1);
+        assertTrue(studentOpt.isPresent());
+        CollegeStudent student = studentOpt.get();
         mockMvc.perform(MockMvcRequestBuilders.delete("/student/{id}", student.getId()))
-                .andExpect(MockMvcResultMatchers.status().isOk())
-                .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
-                .andExpectAll(MockMvcResultMatchers.jsonPath("$", hasSize(0)));
+                .andExpectAll(
+                        status().isOk(),
+                        content().contentType(APPLICATION_JSON),
+                        jsonPath("$", hasSize(0)));
         assertFalse(studentDao.existsById(student.getId()));
     }
 
@@ -176,10 +166,10 @@ class GradebookControllerTest {
     void studentInformationNonExistingStudent() throws Exception {
         assertFalse(studentDao.existsById(2));
         mockMvc.perform(MockMvcRequestBuilders.get("/studentInformation/{id}", 2))
-                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andExpect(status().isNotFound())
                 .andExpectAll(
-                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)),
-                        MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")));
+                        jsonPath("$.status", equalTo(404)),
+                        jsonPath("$.message", equalTo("Student or Grade was not found")));
     }
 
     @Test
@@ -189,11 +179,11 @@ class GradebookControllerTest {
         collegeStudent.setEmailAddress("alihmzyv@gmail.com");
         studentDao.save(collegeStudent);
         mockMvc.perform(MockMvcRequestBuilders.get("/studentInformation/{id}", collegeStudent.getId()))
-                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(status().isOk())
                 .andExpectAll(
-                        MockMvcResultMatchers.jsonPath("$.firstname", equalTo("Ali")),
-                        MockMvcResultMatchers.jsonPath("$.lastname", equalTo("Hamzayev")),
-                        MockMvcResultMatchers.jsonPath("$.emailAddress", equalTo("alihmzyv@gmail.com")));
+                        jsonPath("$.firstname", equalTo("Ali")),
+                        jsonPath("$.lastname", equalTo("Hamzayev")),
+                        jsonPath("$.emailAddress", equalTo("alihmzyv@gmail.com")));
     }
 
     @Test
@@ -206,8 +196,8 @@ class GradebookControllerTest {
                 .param("gradeType", createGradeReq.getParameter("gradeType"))
                 .param("studentId", createGradeReq.getParameter("studentId")))
                 .andExpectAll(
-                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)),
-                        MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")));
+                        jsonPath("$.status", equalTo(404)),
+                        jsonPath("$.message", equalTo("Student or Grade was not found")));
     }
 
     @Test
@@ -219,8 +209,8 @@ class GradebookControllerTest {
                         .param("gradeType", createGradeReq.getParameter("gradeType"))
                         .param("studentId", createGradeReq.getParameter("studentId")))
                 .andExpectAll(
-                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)),
-                        MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")));
+                        jsonPath("$.status", equalTo(404)),
+                        jsonPath("$.message", equalTo("Student or Grade was not found")));
     }
 
     @Test
@@ -232,14 +222,15 @@ class GradebookControllerTest {
                         .param("gradeType", createGradeReq.getParameter("gradeType"))
                         .param("studentId", createGradeReq.getParameter("studentId")))
                 .andExpectAll(
-                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)),
-                        MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")));
+                        jsonPath("$.status", equalTo(404)),
+                        jsonPath("$.message", equalTo("Student or Grade was not found")));
     }
 
     @Test
     void createGradeValid() throws Exception {
-        assertTrue(studentDao.existsById(1));
-        CollegeStudent student = studentDao.findById(1).get();
+        Optional<CollegeStudent> studentOpt = studentDao.findById(1);
+        assertTrue(studentOpt.isPresent());
+        CollegeStudent student = studentOpt.get();
         Iterator<MathGrade> iterator = mathGradeDao.findGradeByStudentId(student.getId()).iterator();
         iterator.next();
         assertFalse(iterator.hasNext());
@@ -247,13 +238,13 @@ class GradebookControllerTest {
                         .param("grade", createGradeReq.getParameter("grade"))
                         .param("gradeType", createGradeReq.getParameter("gradeType"))
                         .param("studentId", createGradeReq.getParameter("studentId")))
-                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(status().isOk())
                 .andExpectAll(
-                        MockMvcResultMatchers.jsonPath("$.id", equalTo(student.getId())),
-                        MockMvcResultMatchers.jsonPath("$.firstname", equalTo(student.getFirstname())),
-                        MockMvcResultMatchers.jsonPath("$.lastname", equalTo(student.getLastname())),
-                        MockMvcResultMatchers.jsonPath("$.emailAddress", equalTo(student.getEmailAddress())),
-                        MockMvcResultMatchers.jsonPath("$.studentGrades.mathGradeResults", hasSize(2)));
+                        jsonPath("$.id", equalTo(student.getId())),
+                        jsonPath("$.firstname", equalTo(student.getFirstname())),
+                        jsonPath("$.lastname", equalTo(student.getLastname())),
+                        jsonPath("$.emailAddress", equalTo(student.getEmailAddress())),
+                        jsonPath("$.studentGrades.mathGradeResults", hasSize(2)));
         assertTrue(mathGradeDao.findGradeByStudentId(student.getId()).iterator().hasNext());
     }
 }
