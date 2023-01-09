@@ -27,6 +27,8 @@ import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
+import static org.hamcrest.core.IsEqual.equalTo;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @AutoConfigureMockMvc
@@ -126,6 +128,7 @@ class GradebookControllerTest {
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
                 .andExpect(MockMvcResultMatchers.jsonPath("$", hasSize(2)));
+        assertTrue(studentDao.findByEmailAddress("chad@luv2code.com").isPresent(), "Should have been saved.");
     }
 
     @Test
@@ -139,6 +142,27 @@ class GradebookControllerTest {
                 .andExpect(MockMvcResultMatchers.status().isOk()) //isCreated() is the right choice actually
                 .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
                 .andExpect(MockMvcResultMatchers.jsonPath("$", hasSize(2)));
-        assertTrue(studentDao.existsById(2), "Student should have been saved already.");
+        studentDao.findAll().forEach(System.out::println);
+        assertTrue(studentDao.findByEmailAddress("chad@luv2code.com").isPresent(), "Student should have been saved already.");
+    }
+
+    @Test
+    void deleteNonExistingStudentRequestTest() throws Exception {
+        assertFalse(studentDao.existsById(2));
+        mockMvc.perform(MockMvcRequestBuilders.delete("/student/{id}", 2))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
+                .andExpectAll(MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")),
+                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)));
+    }
+
+    @Test
+    void deleteExistingStudentRequestTest() throws Exception {
+        assertTrue(studentDao.existsById(1));
+        mockMvc.perform(MockMvcRequestBuilders.delete("/student/{id}", 1))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
+                .andExpectAll(MockMvcResultMatchers.jsonPath("$", hasSize(0)));
+        assertFalse(studentDao.existsById(1));
     }
 }
