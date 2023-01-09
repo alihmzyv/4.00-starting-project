@@ -2,6 +2,7 @@ package com.luv2code.springmvc.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luv2code.springmvc.models.CollegeStudent;
+import com.luv2code.springmvc.models.MathGrade;
 import com.luv2code.springmvc.repository.HistoryGradesDao;
 import com.luv2code.springmvc.repository.MathGradesDao;
 import com.luv2code.springmvc.repository.ScienceGradesDao;
@@ -25,6 +26,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
+import java.util.Iterator;
+import java.util.Random;
 
 import static org.hamcrest.collection.IsCollectionWithSize.hasSize;
 import static org.hamcrest.core.IsEqual.equalTo;
@@ -36,7 +39,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GradebookControllerTest {
     @Autowired
     private MockMvc mockMvc;
-    private static MockHttpServletRequest request;
+    private MockHttpServletRequest createStudentReq;
+    private MockHttpServletRequest createGradeReq;
 
     @Autowired
     private ObjectMapper mapper;
@@ -45,12 +49,13 @@ class GradebookControllerTest {
 
     @Autowired
     private CollegeStudent collegeStudent;
-
     @PersistenceContext
     private EntityManager entityManager;
 
     @Mock
     private StudentAndGradeService studentCreateServiceMock;
+
+    private static final Random rnd = new Random();
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -94,16 +99,16 @@ class GradebookControllerTest {
     @Value("${sql.script.delete.history.grade}")
     private String sqlDeleteHistoryGrade;
 
-    @BeforeAll
-    static void beforeAll() {
-        request = new MockHttpServletRequest();
-        request.setParameter("firstname", "Ali");
-        request.setParameter("lastname", "Hamzayev");
-        request.setParameter("emailAddress", "alihmzyv@gmail.com");
-    }
-
     @BeforeEach
     void setUp() {
+        createStudentReq = new MockHttpServletRequest();
+        createStudentReq.setParameter("firstname", "Ali");
+        createStudentReq.setParameter("lastname", "Hamzayev");
+        createStudentReq.setParameter("emailAddress", "alihmzyv@gmail.com");
+        createGradeReq = new MockHttpServletRequest();
+        createGradeReq.setParameter("grade", "90.0");
+        createGradeReq.setParameter("gradeType", "math");
+        createGradeReq.setParameter("studentId", "1");
         jdbc.execute(sqlAddStudent);
         jdbc.execute(sqlAddMathGrade);
         jdbc.execute(sqlAddScienceGrade);
@@ -159,10 +164,96 @@ class GradebookControllerTest {
     @Test
     void deleteExistingStudentRequestTest() throws Exception {
         assertTrue(studentDao.existsById(1));
-        mockMvc.perform(MockMvcRequestBuilders.delete("/student/{id}", 1))
+        CollegeStudent student = studentDao.findById(1).get();
+        mockMvc.perform(MockMvcRequestBuilders.delete("/student/{id}", student.getId()))
                 .andExpect(MockMvcResultMatchers.status().isOk())
                 .andExpect(MockMvcResultMatchers.content().contentType(APPLICATION_JSON_UTF8))
                 .andExpectAll(MockMvcResultMatchers.jsonPath("$", hasSize(0)));
-        assertFalse(studentDao.existsById(1));
+        assertFalse(studentDao.existsById(student.getId()));
+    }
+
+    @Test
+    void studentInformationNonExistingStudent() throws Exception {
+        assertFalse(studentDao.existsById(2));
+        mockMvc.perform(MockMvcRequestBuilders.get("/studentInformation/{id}", 2))
+                .andExpect(MockMvcResultMatchers.status().isNotFound())
+                .andExpectAll(
+                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)),
+                        MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")));
+    }
+
+    @Test
+    void studentInformationExistingStudent() throws Exception {
+        collegeStudent.setFirstname("Ali");
+        collegeStudent.setLastname("Hamzayev");
+        collegeStudent.setEmailAddress("alihmzyv@gmail.com");
+        studentDao.save(collegeStudent);
+        mockMvc.perform(MockMvcRequestBuilders.get("/studentInformation/{id}", collegeStudent.getId()))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpectAll(
+                        MockMvcResultMatchers.jsonPath("$.firstname", equalTo("Ali")),
+                        MockMvcResultMatchers.jsonPath("$.lastname", equalTo("Hamzayev")),
+                        MockMvcResultMatchers.jsonPath("$.emailAddress", equalTo("alihmzyv@gmail.com")));
+    }
+
+    @Test
+    void createGradeNonExistingStudent() throws Exception {
+        assertFalse(studentDao.existsById(2));
+        createGradeReq.setParameter("studentId", "2");
+        mockMvc.perform(MockMvcRequestBuilders.post("/grades")
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .param("grade", createGradeReq.getParameter("grade"))
+                .param("gradeType", createGradeReq.getParameter("gradeType"))
+                .param("studentId", createGradeReq.getParameter("studentId")))
+                .andExpectAll(
+                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)),
+                        MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")));
+    }
+
+    @Test
+    void createGradeNotInRange() throws Exception {
+        createGradeReq.setParameter("grade", String.valueOf(rnd.nextDouble(100.1, 1000)));
+        mockMvc.perform(MockMvcRequestBuilders.post("/grades")
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .param("grade", createGradeReq.getParameter("grade"))
+                        .param("gradeType", createGradeReq.getParameter("gradeType"))
+                        .param("studentId", createGradeReq.getParameter("studentId")))
+                .andExpectAll(
+                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)),
+                        MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")));
+    }
+
+    @Test
+    void createGradeNonExistingGradeType() throws Exception {
+        createGradeReq.setParameter("gradeType", "gibberish");
+        mockMvc.perform(MockMvcRequestBuilders.post("/grades")
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .param("grade", createGradeReq.getParameter("grade"))
+                        .param("gradeType", createGradeReq.getParameter("gradeType"))
+                        .param("studentId", createGradeReq.getParameter("studentId")))
+                .andExpectAll(
+                        MockMvcResultMatchers.jsonPath("$.status", equalTo(404)),
+                        MockMvcResultMatchers.jsonPath("$.message", equalTo("Student or Grade was not found")));
+    }
+
+    @Test
+    void createGradeValid() throws Exception {
+        assertTrue(studentDao.existsById(1));
+        CollegeStudent student = studentDao.findById(1).get();
+        Iterator<MathGrade> iterator = mathGradeDao.findGradeByStudentId(student.getId()).iterator();
+        iterator.next();
+        assertFalse(iterator.hasNext());
+        mockMvc.perform(MockMvcRequestBuilders.post("/grades")
+                        .param("grade", createGradeReq.getParameter("grade"))
+                        .param("gradeType", createGradeReq.getParameter("gradeType"))
+                        .param("studentId", createGradeReq.getParameter("studentId")))
+                .andExpect(MockMvcResultMatchers.status().isOk())
+                .andExpectAll(
+                        MockMvcResultMatchers.jsonPath("$.id", equalTo(student.getId())),
+                        MockMvcResultMatchers.jsonPath("$.firstname", equalTo(student.getFirstname())),
+                        MockMvcResultMatchers.jsonPath("$.lastname", equalTo(student.getLastname())),
+                        MockMvcResultMatchers.jsonPath("$.emailAddress", equalTo(student.getEmailAddress())),
+                        MockMvcResultMatchers.jsonPath("$.studentGrades.mathGradeResults", hasSize(2)));
+        assertTrue(mathGradeDao.findGradeByStudentId(student.getId()).iterator().hasNext());
     }
 }

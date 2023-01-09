@@ -41,7 +41,6 @@ public class GradebookController {
 
     @PostMapping(value = "/")
     public List<GradebookCollegeStudent> createStudent(@RequestBody CollegeStudent student) {
-
         studentService.createStudent(student.getFirstname(), student.getLastname(), student.getEmailAddress());
         gradebook = studentService.getGradebook();
         return gradebook.getStudents();
@@ -65,20 +64,23 @@ public class GradebookController {
     public GradebookCollegeStudent createGrade(@RequestParam("grade") double grade,
                                                @RequestParam("gradeType") String gradeType,
                                                @RequestParam("studentId") int studentId) {
-
+        //more explanatory exception messages could have been used
         if (!studentService.checkIfStudentIsNull(studentId)) {
+            System.out.println("No student found");
             throw new StudentOrGradeNotFoundException("Student or Grade was not found");
         }
 
         boolean success = studentService.createGrade(grade, studentId, gradeType);
 
         if (!success) {
+            System.out.println("grade problem");
             throw new StudentOrGradeNotFoundException("Student or Grade was not found");
         }
 
         GradebookCollegeStudent studentEntity = studentService.studentInformation(studentId);
 
         if (studentEntity == null) {
+            System.out.println("grade problem");
             throw new StudentOrGradeNotFoundException("Student or Grade was not found");
         }
 

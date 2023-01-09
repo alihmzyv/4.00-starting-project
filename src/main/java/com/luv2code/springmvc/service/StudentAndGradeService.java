@@ -67,10 +67,7 @@ public class StudentAndGradeService {
 
 	public boolean checkIfStudentIsNull(int id){
 		Optional<CollegeStudent> student = studentDao.findById(id);
-		if (student.isPresent()) {
-			return true;
-		}
-		return false;
+		return student.isPresent();
 	}
 
 	public GradebookCollegeStudent studentInformation(int id) {
@@ -189,7 +186,7 @@ public class StudentAndGradeService {
 				return true;
 			}
 		}
-		return false;
+		return false; //the reason is not clear: whether the mark was not in proper range or the
 	}
 
 	public Gradebook getGradebook () {
