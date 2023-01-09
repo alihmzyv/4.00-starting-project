@@ -90,9 +90,10 @@ public class StudentAndGradeServiceTest {
 
         studentService.createStudent("Chad", "Darby", "chad.darby@luv2code_school.com");
 
-        CollegeStudent student = studentDao.findByEmailAddress("chad.darby@luv2code_school.com");
+        Optional<CollegeStudent> studentOpt = studentDao.findByEmailAddress("chad.darby@luv2code_school.com");
 
-        assertEquals("chad.darby@luv2code_school.com", student.getEmailAddress(), "find by email");
+        assertTrue(studentOpt.isPresent());
+        assertEquals("chad.darby@luv2code_school.com", studentOpt.get().getEmailAddress(), "find by email");
     }
 
     @Test
